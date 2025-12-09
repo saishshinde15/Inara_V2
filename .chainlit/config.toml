@@ -1,0 +1,111 @@
+[project]
+# Name of your app
+name = "Inara"
+
+# Whether to enable telemetry
+enable_telemetry = false
+
+# List of environment variables to be provided by each user to use the app
+user_env = []
+
+# Duration (in seconds) during which the session is saved when the connection is lost
+session_timeout = 3600
+user_session_timeout = 604800
+
+# Enable third parties caching
+cache = false
+persist_user_env = false
+allow_origins = ["*"]
+
+[features]
+# Enable prompt playground
+prompt_playground = true
+
+# Enable speech to text
+speech_to_text = false
+
+# Enable latex rendering
+latex = false
+
+# Authorize users to use HTML in messages
+unsafe_allow_html = false
+
+# Auto scroll on new messages
+user_message_autoscroll = true
+
+# Allow editing messages
+edit_message = true
+
+# Allow thread sharing
+allow_thread_sharing = false
+
+# Spontaneous file upload settings
+[features.spontaneous_file_upload]
+enabled = false
+
+# Process and display intermediate steps
+[features.intermediate_steps]
+enabled = true
+
+[UI]
+# Name of the app and chatbot
+name = "Inara"
+
+# Description of the app and target audience
+description = "your intelligent HR assistant"
+
+# The default value for the expand messages settings
+default_expand_messages = false
+
+# Hide the chain of thought details from the user
+hide_cot = false
+
+# Large size content are by default collapsed for a cleaner ui
+default_collapse_content = true
+
+# Default theme
+default_theme = "dark"
+
+# Layout
+layout = "wide"
+
+# Alert style
+alert_style = "modern"
+
+# Serve logos from the public directory
+logo_file_url = "/public/logo_full_light.png"
+
+# Default avatar
+default_avatar_file_url = "/avatars/inara"
+
+# Custom CSS
+custom_css = "/public/custom.css"
+
+[UI.theme]
+# Default theme
+default = "dark"
+
+# Layout
+layout = "wide"
+
+# Available themes
+[UI.theme.light]
+background = "#FAFAFA"
+paper = "#FFFFFF"
+
+[UI.theme.light.primary]
+main = "#4F46E5"
+light = "#818CF8"
+dark = "#3730A3"
+
+[UI.theme.dark]
+background = "#1E1E1E"
+paper = "#2D2D2D"
+
+[UI.theme.dark.primary]
+main = "#818CF8"
+light = "#A5B4FC"
+dark = "#6366F1"
+
+[meta]
+generated_by = "Inara HR Bot V2"

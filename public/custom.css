@@ -1,0 +1,138 @@
+/* Custom Chainlit overrides for Inara branding */
+
+/* ============================================================================
+   Logo & Avatar Sizing
+   ============================================================================ */
+
+/* Increase header logo size (approx 85% larger) */
+img[src*="/logo_full_light"], img[src*="/logo_light"] {
+  max-height: 72px !important;
+  height: auto !important;
+}
+
+/* Increase avatar size for messages */
+.h-5.w-5, .avatar.h-5.w-5, img[alt^="Avatar for "] {
+  width: 2.3125rem !important;
+  height: 2.3125rem !important;
+}
+
+/* When avatar has inner image, ensure it fills container */
+.avatar img, img[alt^="Avatar for "] {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+/* ============================================================================
+   Premium Message Styling
+   ============================================================================ */
+
+/* Smooth fade-in animation for messages */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply animation to new messages */
+[data-testid="message"] {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+/* Enhanced message bubble styling for dark mode */
+.dark [data-testid="message"] {
+  border-radius: 12px !important;
+}
+
+/* Glassmorphism effect for assistant messages in dark mode */
+.dark [data-testid="assistant-message"] {
+  background: rgba(45, 45, 45, 0.85) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ============================================================================
+   Action Buttons Enhancement
+   ============================================================================ */
+
+/* Style action buttons with gradient */
+button[data-testid="action-button"] {
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+button[data-testid="action-button"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4) !important;
+}
+
+/* ============================================================================
+   Typography & Spacing
+   ============================================================================ */
+
+/* Welcome header sizing */
+.inara-brand-block h1 {
+  font-size: clamp(2.6rem, 4.4vw, 4.2rem) !important;
+}
+
+/* Better code block styling */
+pre {
+  border-radius: 8px !important;
+  padding: 1rem !important;
+}
+
+code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+}
+
+/* ============================================================================
+   Loading & Progress States
+   ============================================================================ */
+
+/* Pulse animation for thinking indicator */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Apply to progress messages */
+[data-testid="message"]:has(.thinking) {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Source Citations Styling
+   ============================================================================ */
+
+/* Better styling for source citations */
+[data-testid="message"] hr {
+  margin: 1.5rem 0 1rem 0 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Style inline code (source names) */
+[data-testid="message"] code:not(pre code) {
+  background: rgba(79, 70, 229, 0.2) !important;
+  color: #A5B4FC !important;
+  padding: 0.2rem 0.4rem !important;
+  border-radius: 4px !important;
+  font-size: 0.875rem !important;
+}
+
+/* ============================================================================
+   Responsive Adjustments
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  img[src*="/logo_full_light"], img[src*="/logo_light"] {
+    max-height: 48px !important;
+  }
+}

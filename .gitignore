@@ -1,0 +1,92 @@
+# HR Bot V2 Git Ignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+*.cache
+storage/response_cache/
+*.db
+
+# Data (keep structure, ignore content)
+data/Regular-Employee-Documents/*.pdf
+data/Regular-Employee-Documents/*.docx
+data/Executive-Only-Documents/*
+data/Master-Document/*.pdf
+data/Master-Document/*.docx
+
+# Vector stores
+storage/domain_embeddings/*.npy
+storage/faiss_index/
+
+# S3 cache
+data/s3_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Chainlit
+.chainlit/.langchain.db
+.chainlit/data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak

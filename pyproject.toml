@@ -1,0 +1,120 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hr-bot-v2"
+version = "2.0.0"
+description = "Production-Ready HR Bot with Deep Agents Architecture - Manager + Subagent orchestration"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "HR Bot Team", email = "support@company.com"}
+]
+keywords = ["hr", "chatbot", "deep-agents", "langchain", "langgraph", "rag", "ai"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Core LangChain ecosystem
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langgraph>=0.2.0",
+    
+    # AWS Bedrock for embeddings and LLM
+    "langchain-aws>=0.2.0",
+    "boto3>=1.34.0",
+    "botocore>=1.34.0",
+    
+    # Vector stores and embeddings
+    "faiss-cpu>=1.7.4",
+    "sentence-transformers>=2.2.0",
+    "langchain-huggingface>=0.1.0",
+    
+    # Document processing
+    "docx2txt>=0.8",
+    "python-docx>=1.0.0",
+    "pypdf>=4.0.0",
+    
+    # BM25 hybrid search
+    "rank-bm25>=0.2.2",
+    
+    # Web search
+    "httpx>=0.27.0",
+    
+    # Caching and storage
+    "diskcache>=5.6.0",
+    "numpy>=1.24.0",
+    
+    # Configuration
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0.0",
+    
+    # UI
+    "streamlit>=1.32.0",
+    "chainlit>=1.0.0",
+    
+    # Utilities
+    "tenacity>=8.2.0",
+    "aiofiles>=23.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "black>=24.0.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+observability = [
+    "langsmith>=0.1.0",
+    "opentelemetry-api>=1.22.0",
+    "opentelemetry-sdk>=1.22.0",
+]
+
+[project.scripts]
+hr-bot = "hr_bot.main:main"
+hr-bot-ui = "hr_bot.ui.app:main"
+
+[project.urls]
+Homepage = "https://github.com/company/hr-bot-v2"
+Documentation = "https://github.com/company/hr-bot-v2#readme"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"hr_bot" = ["config/*.yaml", "config/*.json", "ui/assets/*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
