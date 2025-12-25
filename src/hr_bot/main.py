@@ -51,7 +51,8 @@ settings = get_settings()
 def chat(
     query: str,
     session_id: Optional[str] = None,
-    verbose: bool = False
+    verbose: bool = False,
+    web_search_enabled: bool = True
 ) -> Dict[str, Any]:
     """
     Process a single chat query.
@@ -60,6 +61,7 @@ def chat(
         query: User's question
         session_id: Optional session ID for tracking
         verbose: Enable verbose output
+        web_search_enabled: If False, bypasses Manager+General agents and uses only HR RAG
         
     Returns:
         Dict with response, metadata, and session info
@@ -72,16 +74,57 @@ def chat(
     query = query.replace(""", "\"").replace(""", "\"").replace("'", "'").replace("—", "-")
     
     try:
-        manager = get_manager_agent()
-        result = manager.invoke(query, session_id=session_id)
-        
-        return {
-            "response": result["output"],
-            "success": result.get("success", True),
-            "session_id": session_id or str(uuid.uuid4()),
-            "agents_consulted": result.get("metadata", {}).get("agents_consulted", []),
-            "delegations": result.get("delegations", [])
-        }
+        if web_search_enabled:
+            # Full architecture: Manager routes to HR and/or General subagents
+            manager = get_manager_agent()
+            result = manager.invoke(query, session_id=session_id)
+            
+            return {
+                "response": result["output"],
+                "success": result.get("success", True),
+                "session_id": session_id or str(uuid.uuid4()),
+                "agents_consulted": result.get("metadata", {}).get("agents_consulted", []),
+                "delegations": result.get("delegations", []),
+                "web_search_enabled": True
+            }
+        else:
+            # Web search OFF: Skip Manager + General, call HR Subagent directly
+            from hr_bot.deep_agents.subagents import get_hr_subagent
+            hr_subagent = get_hr_subagent()
+            result = hr_subagent.invoke(query)
+            
+            output = result.get("output", "")
+            
+            # Check if HR couldn't find docs - suggest enabling web search
+            no_docs_indicators = [
+                "NO_RELEVANT_DOCUMENTS",
+                "couldn't find this",
+                "couldn't find specific",
+                "not found in",
+                "no information about",
+                "outside HR scope",
+            ]
+            
+            needs_web_search = any(indicator.lower() in output.lower() for indicator in no_docs_indicators)
+            
+            if needs_web_search or not output.strip():
+                # Append suggestion to enable web search
+                suggestion = (
+                    "\n\n---\n\n"
+                    "💡 **Tip:** I couldn't find this in our company HR documents. "
+                    "Toggle **Web Search ON** to search the internet for external information "
+                    "like government regulations, tax rates, or general knowledge."
+                )
+                output = (output or "I couldn't find relevant information in our HR policies.") + suggestion
+            
+            return {
+                "response": output,
+                "success": result.get("success", True),
+                "session_id": session_id or str(uuid.uuid4()),
+                "agents_consulted": ["hr_subagent"],
+                "delegations": [],
+                "web_search_enabled": False
+            }
         
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
@@ -134,18 +177,19 @@ async def achat(
         }
 
 
-def run(query: str, verbose: bool = False) -> str:
+def run(query: str, verbose: bool = False, web_search_enabled: bool = True) -> str:
     """
     Simple run function - returns just the response string.
     
     Args:
         query: User's question
         verbose: Enable verbose output
+        web_search_enabled: If False, uses only HR RAG (no Manager/General)
         
     Returns:
         Response string
     """
-    result = chat(query, verbose=verbose)
+    result = chat(query, verbose=verbose, web_search_enabled=web_search_enabled)
     return result["response"]
 
 

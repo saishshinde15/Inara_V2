@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     rag_search_timeout: int = Field(default=10, alias="RAG_SEARCH_TIMEOUT")  # Reduced
     max_concurrent_subagents: int = Field(default=3, alias="MAX_CONCURRENT_SUBAGENTS")
     subagent_retry_attempts: int = Field(default=2, alias="SUBAGENT_RETRY_ATTEMPTS")
+    
+    # Web Search Toggle (user-controlled, default ON)
+    web_search_enabled_default: bool = Field(default=True, alias="WEB_SEARCH_ENABLED_DEFAULT")
 
     # ============================================================
     # Cache Configuration (optimized for speed)

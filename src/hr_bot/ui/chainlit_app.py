@@ -212,7 +212,7 @@ def _warm_manager(manager: ManagerAgent) -> None:
         # Invoke a simple query to warm up
         for query in WARMUP_QUERIES[:3]:
             try:
-                manager.invoke(query)
+                manager.invoke(query, thread_id="warmup-system-prime")
                 break  # One successful warm-up is enough
             except Exception:
                 continue
@@ -241,75 +241,100 @@ def format_sources(answer: str) -> str:
         return answer
     
     lines = answer.splitlines()
-    
-    # Collect all sources from the response
     all_sources = set()
-    source_patterns = [
-        r"Source:\s*([^\n]+)",  # "Source: filename.docx"
-        r"\(Source:\s*([^)]+)\)",  # "(Source: filename.docx)"
+    
+    # 1. Extract inline references "(Source: ...)" or "(Sources: ...)"
+    inline_patterns = [
+        r"\(Sources?:\s*([^)]+)\)",
+        r"\[Sources?:\s*([^\]]+)\]",
+    ]
+    for pattern in inline_patterns:
+        for match in re.finditer(pattern, answer, re.IGNORECASE):
+            raw_sources = match.group(1).split("•")
+            for s in raw_sources:
+                for sub_s in re.split(r"[,·|]", s):
+                    clean_s = sub_s.strip(" []")
+                    if clean_s and len(clean_s) > 3:
+                        all_sources.add(clean_s)
+    
+    # 2. Process the text line-by-line to find the Sources section
+    cleaned_lines = []
+    in_source_section = False
+    
+    source_section_triggers = [
+        "sources:", "**sources:**", "source documents:", "**source documents:**"
     ]
     
-    for pattern in source_patterns:
-        for match in re.finditer(pattern, answer, re.IGNORECASE):
-            source = match.group(1).strip()
-            # Clean up the source name
-            source = re.sub(r"^\d+\.\s*", "", source)
-            source = re.sub(r"^\[\d+\]\s*", "", source)
-            if source and len(source) > 3:
-                all_sources.add(source)
-    
-    # Find and remove existing Sources sections (we'll add a clean one at the end)
-    cleaned_lines = []
-    skip_source_section = False
-    
     for line in lines:
-        line_lower = line.lower().strip()
+        line_stripped = line.strip()
+        line_lower = line_stripped.lower()
         
         # Detect start of Sources section
-        if (line_lower.startswith("**sources:**") or 
-            line_lower.startswith("sources:") or
-            line_lower == "**source documents:**" or
-            line_lower.startswith("source documents:")):
-            skip_source_section = True
-            continue
+        is_trigger = any(line_lower.startswith(trigger) for trigger in source_section_triggers)
         
-        # Detect end of Sources section (next major section or empty line after items)
-        if skip_source_section:
-            # Continue skipping source items (lines starting with - or bullet)
-            if line.strip().startswith("-") or line.strip().startswith("•"):
-                # Extract source from bullet point
-                source_text = line.strip().lstrip("-•").strip()
+        if is_trigger:
+            in_source_section = True
+            # Check if there are sources on the same line (e.g., "Sources: file1, file2")
+            content_after = "".join(re.split(r"sources?:", line, flags=re.IGNORECASE)[1:]).strip(" *:")
+            if content_after:
+                for s in re.split(r"[•·|]|\s*,\s*", content_after):
+                    clean_s = s.strip(" []`*")
+                    if clean_s and len(clean_s) > 3:
+                        all_sources.add(clean_s)
+            continue
+            
+        if in_source_section:
+            # Continue if it looks like a source item
+            if line_stripped.startswith("-") or line_stripped.startswith("•") or line_stripped.startswith("["):
+                # Extract source from bullet or link
+                # Don't strip brackets if it looks like a markdown link [Label](URL)
+                if "(" in line_stripped and ")" in line_stripped and "[" in line_stripped:
+                    source_text = line_stripped.lstrip("-• ").strip(" `*")
+                else:
+                    source_text = line_stripped.lstrip("-• ").strip(" []`*")
+                    
                 if source_text:
                     all_sources.add(source_text)
                 continue
-            # If it's an empty line, continue skipping
-            if not line.strip():
+            # Stop if we hit a new bold section or substantial new text
+            if line_stripped.startswith("**") or line_stripped.startswith("##"):
+                in_source_section = False
+            # If it's empty, just keep skipping until we hit something else
+            elif not line_stripped:
                 continue
-            # If it's a new section (starts with ** or ##), stop skipping
-            if line.strip().startswith("**") or line.strip().startswith("##"):
-                skip_source_section = False
+            else:
+                # If it's plain text immediately after sources, assume section ended
+                in_source_section = False
         
-        if not skip_source_section:
+        if not in_source_section:
             cleaned_lines.append(line)
     
     # Build clean output
     output = "\n".join(cleaned_lines).strip()
     
-    # Remove inline "(Source: ...)" references for cleaner text
-    output = re.sub(r"\s*\(Source:\s*[^)]+\)", "", output)
+    # Remove all inline source artifacts for clean reading
+    for pattern in inline_patterns:
+        output = re.sub(pattern, "", output, flags=re.IGNORECASE)
+    output = re.sub(r"Source:\s*[^\n]+", "", output, flags=re.IGNORECASE)
     
-    # Add consolidated Sources section at the end
+    # Add consolidated Sources section at the end if we found anything
     if all_sources:
         formatted_sources = []
         for source in sorted(all_sources):
-            # Clean and format source name
+            # If it's a URL/Markdown link, keep it as is
+            if "http" in source or "(" in source and ")" in source:
+                formatted_sources.append(source)
+                continue
+                
+            # Clean and format internal filename
             display_name = source.replace("_", " ").strip()
-            # Remove .docx extension for cleaner display
             display_name = re.sub(r"\.docx$", "", display_name, flags=re.IGNORECASE)
             if display_name:
                 formatted_sources.append(f"`{display_name}`")
         
         if formatted_sources:
+            # Ensure we don't end with double separators
+            output = output.strip("- \n")
             output += f"\n\n---\n\n**Sources:** {' · '.join(formatted_sources)}"
     
     return output
@@ -455,9 +480,19 @@ def _compose_dashboard(display_name: str, role: str) -> str:
     )
 
 
-async def _send_dashboard(display_name: str, role: str) -> None:
+async def _send_dashboard(display_name: str, role: str, web_search_enabled: bool = True) -> None:
     """Send the dashboard with action buttons."""
+    # Dynamic label for web search toggle
+    web_toggle_label = "🌐 Web Search: ON" if web_search_enabled else "🔒 Web Search: OFF"
+    web_toggle_tooltip = "Click to disable web search (HR docs only)" if web_search_enabled else "Click to enable web search"
+    
     actions = [
+        cl.Action(
+            name="toggle_web_search",
+            payload={"current_state": web_search_enabled},
+            label=web_toggle_label,
+            tooltip=web_toggle_tooltip,
+        ),
         cl.Action(
             name="refresh_s3_docs",
             payload={"role": role},
@@ -519,20 +554,61 @@ async def _clear_response_cache() -> str:
 
 
 async def _query_manager(prompt: str, thread_id: str) -> Dict[str, Any]:
-    """Query the manager agent."""
-    manager: ManagerAgent = cl.user_session.get("manager")
-    if manager is None:
-        role = cl.user_session.get("role", "employee")
-        manager = await _get_manager(role)
-        cl.user_session.set("manager", manager)
+    """Query the manager agent or HR subagent based on web search toggle."""
+    web_search_enabled = cl.user_session.get("web_search_enabled", True)
     
-    # Set thread for memory continuity
-    manager.set_thread(thread_id)
-    
-    def _call_manager() -> Dict[str, Any]:
-        return manager.invoke(prompt, thread_id=thread_id)
+    if web_search_enabled:
+        # Full architecture: Manager routes to HR and/or General subagents
+        manager: ManagerAgent = cl.user_session.get("manager")
+        if manager is None:
+            role = cl.user_session.get("role", "employee")
+            manager = await _get_manager(role)
+            cl.user_session.set("manager", manager)
+        
+        # Set thread for memory continuity
+        manager.set_thread(thread_id)
+        
+        def _call_manager() -> Dict[str, Any]:
+            return manager.invoke(prompt, thread_id=thread_id)
 
-    return await _run_blocking(_call_manager)
+        return await _run_blocking(_call_manager)
+    else:
+        # Web search OFF: Skip Manager + General, call HR Subagent directly
+        def _call_hr_directly() -> Dict[str, Any]:
+            hr_subagent = get_hr_subagent()
+            result = hr_subagent.invoke(prompt)
+            
+            output = result.get("output", "")
+            
+            # Check if HR couldn't find docs - suggest enabling web search
+            no_docs_indicators = [
+                "NO_RELEVANT_DOCUMENTS",
+                "couldn't find this",
+                "couldn't find specific",
+                "not found in",
+                "no information about",
+                "outside HR scope",
+            ]
+            
+            needs_web_search = any(indicator.lower() in output.lower() for indicator in no_docs_indicators)
+            
+            if needs_web_search or not output.strip():
+                suggestion = (
+                    "\n\n---\n\n"
+                    "💡 **Tip:** I couldn't find this in our company HR documents. "
+                    "Click the **🔒 Web Search: OFF** button above to enable web search "
+                    "for external information like government regulations, tax rates, or general knowledge."
+                )
+                output = (output or "I couldn't find relevant information in our HR policies.") + suggestion
+            
+            return {
+                "output": output,
+                "success": result.get("success", True),
+                "agents_consulted": ["hr_subagent"],
+                "cached": False
+            }
+        
+        return await _run_blocking(_call_hr_directly)
 
 
 # ---------------------------------------------------------------------------
@@ -628,6 +704,10 @@ async def on_chat_start() -> None:
     cl.user_session.set("display_name", display_name)
     cl.user_session.set("history", [])
     
+    # Initialize web search toggle (default: ON)
+    web_search_enabled = settings.web_search_enabled_default
+    cl.user_session.set("web_search_enabled", web_search_enabled)
+    
     # Create new thread for this conversation
     thread_id = str(uuid.uuid4())
     cl.user_session.set("thread_id", thread_id)
@@ -640,10 +720,11 @@ async def on_chat_start() -> None:
     # Warm up in background (don't wait)
     asyncio.create_task(_ensure_warm(role, manager))
     
-    # Send dashboard
-    await _send_dashboard(display_name, role)
+    # Send dashboard with web search toggle state
+    await _send_dashboard(display_name, role, web_search_enabled)
     
-    # Welcome message
+    # Welcome message with toggle info
+    web_status = "🌐 ON" if web_search_enabled else "🔒 OFF"
     await cl.Message(
         author=_author_as_string(APP_NAME),
         content=(
@@ -651,6 +732,7 @@ async def on_chat_start() -> None:
             f"I can assist with:\n"
             f"- 📋 **HR policies** – leave, benefits, onboarding, expenses\n"
             f"- 🌏 **General knowledge** – government schemes, regulations, any topic\n\n"
+            f"**Web Search:** {web_status} _(use the toggle above to change)_\n\n"
             f"_Try: \"What is the maternity leave policy and how do I apply?\"_"
         ),
     ).send()
@@ -702,9 +784,15 @@ async def on_message(message: cl.Message) -> None:
             answer = cached.get("response", "")
             is_cached = True
         else:
-            await update_progress("🧠 **Understanding your question...**\n\n_Routing to the best specialist agent_")
-            await asyncio.sleep(0.3)  # Brief pause for UX
-            await update_progress("🔍 **Searching knowledge base...**\n\n_Checking HR policies and external sources_")
+            # Show appropriate progress based on web search mode
+            web_search_enabled = cl.user_session.get("web_search_enabled", True)
+            if web_search_enabled:
+                await update_progress("🧠 **Understanding your question...**\n\n_Routing to the best specialist agent_")
+                await asyncio.sleep(0.3)  # Brief pause for UX
+                await update_progress("🔍 **Searching knowledge base...**\n\n_Checking HR policies and external sources_")
+            else:
+                await update_progress("🔍 **Searching HR documents...**\n\n_Web search is OFF - checking company policies only_")
+            
             result = await _query_manager(prompt, thread_id)
             answer = result.get("output", "")
             is_cached = result.get("cached", False)
@@ -752,6 +840,40 @@ async def refresh_docs(action: cl.Action) -> None:
     except Exception as exc:
         logger.exception("S3 refresh failed", exc_info=exc)
         await cl.Message(content=f"⚠️ Error refreshing documents: {exc}").send()
+
+
+@cl.action_callback("toggle_web_search")
+async def toggle_web_search(action: cl.Action) -> None:
+    """Toggle web search on/off."""
+    # Get current state and toggle it
+    current_state = cl.user_session.get("web_search_enabled", True)
+    new_state = not current_state
+    cl.user_session.set("web_search_enabled", new_state)
+    
+    # Send confirmation message
+    if new_state:
+        status_msg = (
+            "🌐 **Web Search: ENABLED**\n\n"
+            "I'll now search the internet for external information like:\n"
+            "- Government regulations & tax rates\n"
+            "- Flight prices & travel info\n"
+            "- General knowledge & current events\n\n"
+            "_Your queries will be routed to the best specialist agent._"
+        )
+    else:
+        status_msg = (
+            "🔒 **Web Search: DISABLED**\n\n"
+            "I'll only search your company HR documents.\n"
+            "This is faster and stays within your internal knowledge base.\n\n"
+            "_If I can't find what you need, I'll suggest enabling web search._"
+        )
+    
+    await cl.Message(content=status_msg).send()
+    
+    # Refresh dashboard with updated toggle button
+    display_name = cl.user_session.get("display_name", "User")
+    role = cl.user_session.get("role", "employee")
+    await _send_dashboard(display_name, role, new_state)
 
 
 @cl.action_callback("clear_response_cache")

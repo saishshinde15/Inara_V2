@@ -180,24 +180,28 @@ def get_finance_search_tool() -> FinanceSerperSearchTool:
 @tool
 def finance_web_search(query: str, num_results: int = 5) -> str:
     """
-    Search the web for external finance/government regulations.
+    Search the web for ANY external information using Google search.
     
-    Use this tool for questions about:
-    - GST rates and calculations
-    - TDS rates and deductions
-    - EPF/PF contribution rates and withdrawal rules
-    - Income tax slabs and rules
-    - RBI circulars and regulations
-    - External financial compliance
+    Use this tool for ANY questions requiring current/external information:
+    - Flight prices and travel deals
+    - Hotel prices and booking information
+    - Income tax slabs and tax calculations
+    - GST rates on any product/service
+    - Government regulations and schemes
+    - Stock prices, currency rates, market data
+    - Current events, news, and real-time information
+    - Product prices, reviews, and comparisons
+    - General knowledge that needs verification
     
-    DO NOT use for internal company policies (use hr_document_search instead).
+    YOU MUST USE THIS TOOL to get accurate, up-to-date information.
+    Your internal knowledge is outdated - ALWAYS search!
     
     Args:
-        query: The finance query - be specific about what rates/rules needed
+        query: The search query - be specific about what you need
         num_results: Number of search results to fetch (default: 5)
     
     Returns:
-        Search results with sources and disclaimer, or error message
+        Search results with sources and links, or error message
     """
     search_tool = get_finance_search_tool()
     return search_tool.search(query, num_results=num_results)
